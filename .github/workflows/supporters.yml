@@ -1,0 +1,65 @@
+name: Refresh KalArts supporters
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  push:
+    branches: [main]
+    paths-ignore: ['.state/**', 'README.md']
+
+concurrency:
+  group: kalarts-supporter-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    if: github.repository == 'NullxVoid00/kalarts-supporters' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+    steps:
+      - name: Check out trusted main branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+      - name: Check encryption and public-feed rules
+        run: |
+          node --test test_state.mjs
+          python3 -m unittest -v test_sync
+      - name: Fetch current supporters and preserve encrypted session
+        env:
+          KALARTS_STATE_KEY: ${{ secrets.KALARTS_STATE_KEY }}
+        run: node cloud_sync.mjs
+      - name: Keep encrypted recovery state if sync failed
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: encrypted-session-${{ github.run_id }}
+          path: .state/patreon.enc
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Package only public recognition data
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: public
+
+  deploy:
+    needs: sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish validated supporter feed
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
