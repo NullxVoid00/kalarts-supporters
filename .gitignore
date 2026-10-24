@@ -1,0 +1,7 @@
+public/
+__pycache__/
+*.pyc
+.env
+session.json
+config.json
+*-key.txt
