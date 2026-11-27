@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import time
 import sync_patrons as sync
+from verified_hosts import make_hosts
 
 
 def run(state_path, output):
@@ -24,11 +25,14 @@ def run(state_path, output):
         after['last_refresh'] = time.time()
         sync.atomic_write(state_path, json.dumps(after))
     config = after['config']
-    feed = sync.make_feed(sync.pages_from_api(token, str(config['campaign_id'])), config)
+    pages = list(sync.pages_from_api(token, str(config['campaign_id'])))
+    feed = sync.make_feed(pages, config)
     payload = json.dumps(feed, ensure_ascii=False, indent=2) + '\n'
     if len(payload.encode('utf-8')) > 4000000:
         raise ValueError('Feed exceeds the public reader size limit.')
     sync.atomic_write(output, payload)
+    hosts = make_hosts(pages, os.environ.get('KALARTS_VRCHAT_LINKS', ''))
+    sync.atomic_write(Path(output).with_name('verified-hosts.json'), json.dumps(hosts, ensure_ascii=False) + '\n')
     print('Validated supporter feed: ' + str(len(feed['patrons'])) + ' active paid supporters.')
 
 

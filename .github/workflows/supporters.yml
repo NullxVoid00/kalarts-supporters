@@ -30,9 +30,10 @@ jobs:
       - name: Check encryption and public-feed rules
         run: |
           node --test test_state.mjs
-          python3 -m unittest -v test_sync
+          python3 -m unittest -v test_sync test_hosts
       - name: Fetch current supporters and preserve encrypted session
         env:
+          KALARTS_VRCHAT_LINKS: ${{ secrets.KALARTS_VRCHAT_LINKS }}
           KALARTS_STATE_KEY: ${{ secrets.KALARTS_STATE_KEY }}
         run: node cloud_sync.mjs
       - name: Keep encrypted recovery state if sync failed
